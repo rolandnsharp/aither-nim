@@ -91,6 +91,52 @@ Patches are compiled as shared libraries (`nim c --app:lib`) and loaded
 via `dlopen`. An atomic pointer swap replaces the running function.
 The audio thread never stops.
 
+## One language, every instrument
+
+Aither is a synthesizer, a sequencer, a looper, a live coder,
+a composer, and an oscilloscope. They're all the same operation —
+`f(s) → sample`:
+
+```
+# synthesizer
+saw(midi_freq) |> lpf(cc(1) * 4000, 0.8)
+
+# sequencer
+sin(notes([60, 64, 67, 72], bpm)) * (impulse(bpm/60) |> discharge(4))
+
+# looper — a delay line with feedback = 1
+signal |> fbdelay(4 * 60/bpm, 4 * 60/bpm, 1.0)
+
+# composer — pipe through time with hold()
+kick + hat * 0.3 + bass |> reverb(1.5, 0.3)
+  |> hold(16)
+  kick + hat * 0.5 + bass + lead
+  |> hold(32)
+  |> fadeout(4)
+```
+
+### Three targets, same language
+
+- **Native binary** — Nim compiled to C. Maximum performance.
+- **Browser** — DSP compiled to JS via `nim js`. Instant REPL,
+  zero install. Type math, hear sound.
+- **PicoCalc** — portable synthesizer on a $50 calculator.
+  MIDI keyboard in, audio out, oscilloscope on screen.
+  Type a line of math, play it on a piano.
+
+### Design docs
+
+- [Physics primitives](docs/PHYSICS_PRIMITIVES.md) — impulse, resonator, discharge
+- [Composition](docs/COMPOSITION.md) — `hold()` pipes through time
+- [Feedback](docs/FEEDBACK.md) — why `$fb` is the honest expression
+- [Looper](docs/LOOPER.md) — a looper is a delay with feedback = 1
+- [Oscilloscope](docs/OSCILLOSCOPE.md) — phosphor dot tracing
+- [Spectral](docs/SPECTRAL.md) — why no FFT, and what to use instead
+- [Patterns](docs/PATTERNS.md) — rhythmic techniques without a pattern system
+- [Faust comparison](docs/FAUST_COMPARISON.md) — how `+` replaces six operators
+- [Browser REPL](docs/BROWSER_REPL.md) — instant sound in three files
+- [Multichannel](docs/MULTICHANNEL.md) — stereo and polyphony via arrays
+
 ## Requirements
 
 - Nim 2.x

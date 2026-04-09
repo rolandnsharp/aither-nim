@@ -4,14 +4,21 @@
 - Old .so leak management — defer unload 2-3 callbacks after swap
 
 ### DSP
-- Multichannel expansion SuperCollider style — if a DSP function
-  receives an array where a scalar is expected, automatically expand
-  to run the whole graph once per channel:
-    sin([440.0, 441.0], s) * 0.3
-    # equivalent to:
-    [sin(440.0, s) * 0.3, sin(441.0, s) * 0.3]
-  This enables stereo detuning, spatial arrays, ambisonic encoding
-  in one line. Significant feature, implement when needed.
+- Physics primitives — impulse, resonator, discharge
+  (see docs/PHYSICS_PRIMITIVES.md)
+- Multichannel expansion — arrays mean two different things:
+  - Arrays as INPUT = polyphony. Run the function N times
+    with separate state, sum to mono:
+      sin([220, 330, 440]) * 0.3
+      # three oscillators, separate state, summed to one float
+  - Arrays as OUTPUT = channels. Route to speakers:
+      sin(440) |> pan(0.3)
+      # returns [left, right]
+  - Both together:
+      sin([220, 330, 440]) * 0.3 |> pan([-0.5, 0, 0.5])
+      # three voices, each panned differently, returns [left, right]
+  - Engine checks the return: float = duplicate to both channels,
+    array of 2 = stereo, array of N = surround/ambisonics
 
 ### Signal combination
 - Reference other signals by name in a signal block.

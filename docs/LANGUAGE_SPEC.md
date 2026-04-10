@@ -121,14 +121,14 @@ let b = sin(442)
 Expression-oriented. Always returns a value.
 
 ```
-if $count > 1000 then saw(55) else sin(440)
+if $count > 1000 then osc(saw, 55) else osc(sin, 440)
 ```
 
 With else-if:
 
 ```
-if t < 4 then sin(440)
-else if t < 8 then saw(220)
+if t < 4 then osc(sin, 440)
+else if t < 8 then osc(saw, 220)
 else noise() * 0.1
 ```
 
@@ -142,7 +142,7 @@ def pluck(freq):
   noise() * impulse(3) |> resonator(freq, 0.2)
 
 def chord(root):
-  sin(root) + sin(root * 5/4) + sin(root * 3/2)
+  osc(sin, root) + osc(sin, root * 5/4) + osc(sin, root * 3/2)
 
 pluck(330) + chord(220) * 0.2
 ```
@@ -161,16 +161,45 @@ its own persistent state via the DSP counter.
 
 ### Oscillators
 
+One oscillator: `osc(shape, freq)`. The shape is a math
+function. The oscillator manages the phasor internally.
+
+```
+osc(sin, 440)      # sine wave
+osc(saw, 440)      # sawtooth
+osc(tri, 440)      # triangle
+osc(sqr, 440)      # square
+osc(x => sin(x) + sin(3*x)/3, 440)  # custom harmonic
+```
+
+No shortcuts. Every oscillator is `osc`. The shape and the
+clock are separate concepts composed together.
+
+The shapes are plain math functions, usable independently
+as waveshapers:
+
+```
+sin(signal * 5)    # sine waveshaping distortion
+saw(signal * 3)    # sawtooth folding
+```
+
+Built-in shapes:
+
+| Function | Formula | Description |
+|----------|---------|-------------|
+| `sin(x)` | sin(x) | sine curve |
+| `saw(x)` | x * 2 - 1 | ramp -1 to 1 |
+| `tri(x)` | abs(x * 4 - 2) - 1 | triangle fold |
+| `sqr(x)` | if x < 0.5 then 1 else -1 | square |
+
+Other oscillator functions:
+
 | Function | Description |
 |----------|-------------|
-| `sin(freq)` | sine wave |
-| `saw(freq)` | sawtooth |
-| `tri(freq)` | triangle |
-| `square(freq)` | square wave |
-| `pulse(freq, width)` | variable pulse width |
-| `phasor(freq)` | ramp 0 to 1 |
+| `phasor(freq)` | raw ramp 0 to 1 |
 | `wave(freq, [values])` | wavetable / sequencer |
 | `noise()` | white noise |
+| `pulse(freq, width)` | variable pulse width |
 
 ### Filters
 
@@ -210,13 +239,19 @@ its own persistent state via the DSP counter.
 | `decay(signal, rate)` | exp(-signal * rate) |
 | `pan(signal, pos)` | stereo pan, returns [L, R] |
 
-### Math (pass-through from host language)
+### Math
+
+All math functions are stateless. They compute values.
+They are also the shape functions passed to `osc`.
 
 | Function | Description |
 |----------|-------------|
-| `sin(x)` | sine (math, not oscillator — one arg) |
+| `sin(x)` | sine |
 | `cos(x)` | cosine |
 | `tan(x)` | tangent |
+| `saw(x)` | sawtooth shape: x * 2 - 1 |
+| `tri(x)` | triangle shape: abs(x * 4 - 2) - 1 |
+| `sqr(x)` | square shape: if x < 0.5 then 1 else -1 |
 | `exp(x)` | e^x |
 | `log(x)` | natural log |
 | `log2(x)` | log base 2 |
@@ -229,28 +264,10 @@ its own persistent state via the DSP counter.
 | `sqrt(x)` | square root |
 | `clamp(x, lo, hi)` | clamp to range |
 
-Note: `sin(440)` (one arg) is math sine. `sin(440)` as a
-DSP oscillator is distinguished by context — if it appears
-in a pipe or its result is piped, it's the oscillator.
-Actually: the DSP oscillator uses the phasor internally.
-The math `sin` is just `Math.sin`. The distinction:
-
-- `sin(freq)` where freq is meant as Hz → DSP oscillator
-- `sin(x)` where x is a phase/angle → math function
-
-This ambiguity is resolved by naming the oscillator `osc_sin`
-or by using `sine` for the oscillator and `sin` for math.
-
-**Resolution: use `sine` for the oscillator, `sin` for math:**
-
-```
-sine(440) |> lpf(800, 0.5)        # oscillator at 440 Hz
-sin(TAU * $phase) * 0.3            # math sine of a value
-```
-
-This applies to all oscillator/math conflicts:
-- `sine` / `sin`
-- No conflict for `saw`, `tri`, `square`, `noise` — no math equivalents
+No ambiguity between oscillators and math. `sin` is always
+the math function. `osc(sin, 440)` is the oscillator. The
+oscillator is a composition of a shape and a clock — not a
+separate concept.
 
 ## Arrays
 
@@ -260,7 +277,7 @@ When a DSP function receives an array, it runs once per
 element with independent state. Results are summed.
 
 ```
-sine([220, 330, 440]) * 0.3
+osc(sin, [220, 330, 440]) * 0.3
 # three oscillators, separate state, summed to mono
 ```
 
@@ -269,20 +286,20 @@ sine([220, 330, 440]) * 0.3
 Return an array of two for stereo:
 
 ```
-sine(440) |> pan(0.3)
+osc(sin, 440) |> pan(0.3)
 # returns [left, right]
 ```
 
 Manual stereo:
 
 ```
-[sine(440), sine(442)]
+[osc(sin, 440), osc(sin, 442)]
 ```
 
 ### Both
 
 ```
-sine([220, 330, 440]) * 0.3 |> pan([-0.5, 0, 0.5])
+osc(sin, [220, 330, 440]) * 0.3 |> pan([-0.5, 0, 0.5])
 # three voices, panned, summed to stereo
 ```
 
@@ -293,19 +310,16 @@ is the output sample.
 
 ```
 # bindings
-let freq = 440 + sine(0.3) * 50
-
-# state updates
-$phase += freq / sr
+let freq = 440 + osc(sin, 0.3) * 50
 
 # output (last expression)
-sin(TAU * $phase) * 0.5
+osc(sin, freq) * 0.5
 ```
 
 Statements are separated by newlines or semicolons:
 
 ```
-$phase += 440 / sr; sin(TAU * $phase) * 0.5
+let lfo = osc(sin, 0.3) * 50; osc(sin, 440 + lfo) * 0.5
 ```
 
 ## Comments
@@ -317,9 +331,9 @@ $phase += 440 / sr; sin(TAU * $phase) * 0.5
 ## Composition (future)
 
 ```
-sine(440) |> lpf(800, 0.5)
+osc(sin, 440) |> lpf(800, 0.5)
   |> hold(8)
-  saw(220) |> reverb(1.5, 0.3)
+  osc(saw, 220) |> reverb(1.5, 0.3)
   |> hold(8)
   |> fadeout(4)
 ```
@@ -339,7 +353,7 @@ When MIDI is connected, additional globals:
 | `cc(n)` | control change value 0-1 |
 
 ```
-sine(midi_freq) * midi_vel * (midi_gate |> discharge(4))
+osc(sin, midi_freq) * midi_vel * (midi_gate |> discharge(4))
 ```
 
 ## Signal references (future)
@@ -357,22 +371,20 @@ kick + hat * 0.3 |> reverb(1.5, 0.3)
 
 ## Implementation targets
 
-### Browser (transpiler)
+### Browser (transpiler — parser in JS)
 
 Parse aither syntax, emit JavaScript strings, eval with
-`new Function()`. The DSP stdlib is hand-written JS
-(stdlib.js). The AudioWorklet calls the function per sample.
+`new Function()`. DSP stdlib written in aither, transpiled
+to JS. AudioWorklet calls the function per sample.
 
-### Native (compiler)
+### Native (compiler — parser in Nim)
 
-Parse aither syntax, emit Nim AST or C code. Compile to
-native binary. DSP stdlib is compiled Nim (dsp.nim).
+Parse aither syntax, emit C. Compile with gcc (desktop) or
+arm-gcc (PicoCalc/Teensy). DSP stdlib written in aither,
+transpiled to C. Engine written in Nim.
 
-### Embedded (interpreter)
-
-Parse aither syntax, compile to bytecode, execute in a
-stack VM. DSP stdlib is compiled C/Nim called via function
-table. Runs on PicoCalc, Teensy, any microcontroller.
+Two separate parsers (~500 lines each), same grammar. The
+browser parser emits JS. The native parser emits C.
 
 ## Complete example
 
@@ -385,7 +397,7 @@ let notes = [55, 55, 82, 55, 73, 55, 98, 55]
 let freq = wave(bpm / 60, notes)
 let env = impulse(bpm / 60) |> discharge(8)
 
-saw(freq)
+osc(saw, freq)
   |> lpf(200 + env * 4000, 0.85)
   |> gain(0.4)
   |> delay(0.375, 0.5, 0.3)

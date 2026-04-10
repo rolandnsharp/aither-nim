@@ -1,73 +1,53 @@
 # TODO
 
-### Correctness
-- Old .so leak management — defer unload 2-3 callbacks after swap
-
-### DSP
+### Next up
+- Browser REPL prototype — the first real demo of the language
+  - Write JS parser (~500 lines) that parses aither syntax
+  - Transpile to JS strings, eval with new Function()
+  - DSP stdlib written in aither, transpiled to JS
+  - AudioWorklet for per-sample evaluation
+  - Phosphor oscilloscope on canvas
+  - Three files: index.html, stdlib.js, worklet.js
+  - See docs/BROWSER_REPL.md and docs/LANGUAGE_SPEC.md
+- Stereo — engine always returns a pair, pan() primitive
+- Polyphony — array expansion with separate state contexts
+  (see docs/MULTICHANNEL.md)
 - Physics primitives — impulse, resonator, discharge
   (see docs/PHYSICS_PRIMITIVES.md)
-- Multichannel expansion — arrays mean two different things:
-  - Arrays as INPUT = polyphony. Run the function N times
-    with separate state, sum to mono:
-      sin([220, 330, 440]) * 0.3
-      # three oscillators, separate state, summed to one float
-  - Arrays as OUTPUT = channels. Route to speakers:
-      sin(440) |> pan(0.3)
-      # returns [left, right]
-  - Both together:
-      sin([220, 330, 440]) * 0.3 |> pan([-0.5, 0, 0.5])
-      # three voices, each panned differently, returns [left, right]
-  - Engine checks the return: float = duplicate to both channels,
-    array of 2 = stereo, array of N = surround/ambisonics
 
-### Signal combination
-- Reference other signals by name in a signal block.
-  Last sample of named signal available as a value:
-    signal "mix", s:
-      kick + hat * 0.5 + bass |> reverb(1.5, 0.3)
+### Engine
+- Old .so leak management — defer unload 2-3 callbacks after swap
+- Signal references — last sample of named signal available
+  as a value for conductor pattern (see docs/PHYSICS_PRIMITIVES.md)
 - Globals table for shared state between signals —
   sidechain compression, tempo sync, shared LFO
+- hold() for composition — scheduled hot-swap triggered by
+  the clock (see docs/COMPOSITION.md)
 
 ### Live tooling
+- Phosphor oscilloscope — Y-T waveform, X-Y phase portrait,
+  state waterfall (see docs/OSCILLOSCOPE.md)
 - aither debug — print signal state values without stopping audio
-- aither watch name field — stream a named state value to terminal
-- Better error messages — line numbers, highlight failing expression
+- aither watch — stream a named state value to terminal
 
-### Performance
-- Hash table for state key lookup — replace linear scan for
-  complex patches with many named state fields
-
-### Targets
-- JACK backend via miniaudio flag — same binary, no recompile
-- Browser target — nim js compilation, Web Audio backend
-- MIDI input — for live keyboard performance
-- Raspberry Pi — ARM binary, test signal count ceiling
-- C interpreter — sub-100ms swap times, embedded targets,
-  your own language runtime
-
-### Language future
-- Interpreter / REPL (~1000 lines):
-  - Tokenizer, parser, bytecode compiler, stack VM
-  - ~30 DSP functions, arithmetic, $state, let, if/then/else, |>
-  - Everything is float64 — no type system needed
-  - DSP primitives are compiled Nim called via function table
-  - Same syntax as compiled Nim patches
-- No significant whitespace — expressions work on a single line,
-  use if/then/else not indented blocks. Better for REPL and
-  PicoCalc keyboard. Compiled Nim backend keeps Nim's rules.
-- $name for persistent state, let for immutable bindings,
-  += for state mutation. No := or var.
-- Implicit s — DSP functions get state injected by the interpreter.
-  User writes sin(440) not sin(440, s). For compiled Nim, macro
-  rewrites AST to inject s.
-- Browser REPL — compile DSP stdlib to JS via nim js, eval patches
-  instantly. Three files: index.html, dsp.js, worklet.js.
-  (see docs/BROWSER_REPL.md)
+### Native compiler
+- Nim parser (~500 lines) that parses aither syntax, emits C
+- Same grammar as browser parser, different output
+- DSP stdlib written in aither, transpiled to C
+- Engine stays in Nim — audio callback, state, sockets
+- Compile with gcc (desktop) or arm-gcc (PicoCalc)
 
 ### Hardware
-- PicoCalc + Pico Plus 2W — portable synth, interpreter on device
-- I2S DAC (PCM5102) for high quality audio output from Pico
-- MIDI input via USB — midi_freq and midi_gate as injected values,
-  CC knobs mapped to any parameter in the expression
-- Teensy 4.1 as alternative board — 600MHz, hardware double
-  precision FPU, audio shield for studio quality output
+- PicoCalc + Pico Plus 2W — portable synth
+- I2S DAC (PCM5102) for high quality audio output
+- MIDI input via USB — midi_freq, midi_gate, cc(n) as globals
+- Teensy 4.1 option — 600MHz, audio shield, USB MIDI host
+
+### Language
+- osc(shape, freq) — unified oscillator, shapes are math functions
+  (see docs/LANGUAGE_SPEC.md)
+- No significant whitespace — if/then/else, single-line expressions
+- $name for state, let for bindings, += for mutation
+- def for user functions
+- Implicit s — DSP functions get state injected
+- Everything is float64 — no type system

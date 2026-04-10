@@ -46,9 +46,28 @@
   your own language runtime
 
 ### Language future
-- aither repl — readline loop, blank line triggers compile,
-  sends to running engine
-- Custom language with same syntax — C interpreter,
-  instant eval, no compile step.
-  This is the long term vision: same signal philosophy,
-  your own runtime, runs on microcontrollers
+- Interpreter / REPL (~1000 lines):
+  - Tokenizer, parser, bytecode compiler, stack VM
+  - ~30 DSP functions, arithmetic, $state, let, if/then/else, |>
+  - Everything is float64 — no type system needed
+  - DSP primitives are compiled Nim called via function table
+  - Same syntax as compiled Nim patches
+- No significant whitespace — expressions work on a single line,
+  use if/then/else not indented blocks. Better for REPL and
+  PicoCalc keyboard. Compiled Nim backend keeps Nim's rules.
+- $name for persistent state, let for immutable bindings,
+  += for state mutation. No := or var.
+- Implicit s — DSP functions get state injected by the interpreter.
+  User writes sin(440) not sin(440, s). For compiled Nim, macro
+  rewrites AST to inject s.
+- Browser REPL — compile DSP stdlib to JS via nim js, eval patches
+  instantly. Three files: index.html, dsp.js, worklet.js.
+  (see docs/BROWSER_REPL.md)
+
+### Hardware
+- PicoCalc + Pico Plus 2W — portable synth, interpreter on device
+- I2S DAC (PCM5102) for high quality audio output from Pico
+- MIDI input via USB — midi_freq and midi_gate as injected values,
+  CC knobs mapped to any parameter in the expression
+- Teensy 4.1 as alternative board — 600MHz, hardware double
+  precision FPU, audio shield for studio quality output
